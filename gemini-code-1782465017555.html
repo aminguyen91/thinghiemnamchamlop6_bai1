@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mô phỏng Thí nghiệm Tương tác Nam châm</title>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --bg-color: #eef2f3;
+            --panel-bg: #ffffff;
+            --north-color: #e74c3c; /* Đỏ - Cực N */
+            --south-color: #3498db; /* Xanh - Cực S */
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            width: 800px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        h2 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+
+        /* Khung mô phỏng thí nghiệm */
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            height: 400px;
+            background: linear-gradient(to bottom, #e0f2fe, #ffffff);
+            border: 2px solid #cbd5e1;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        /* Giá treo */
+        .stand {
+            position: absolute;
+            top: 0;
+            left: 40%;
+            width: 80px;
+            height: 10px;
+            background-color: #334155;
+        }
+        .stand::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 35px;
+            width: 4px;
+            height: 120px;
+            background-color: #64748b;
+        }
+
+        /* Nam châm treo (Nam châm 1) */
+        #magnet-suspended {
+            position: absolute;
+            top: 120px;
+            left: calc(40% + 37px);
+            width: 160px;
+            height: 30px;
+            transform-origin: top center;
+            transform: translateX(-50%) rotate(5deg);
+            display: flex;
+            transition: transform 0.1s linear;
+        }
+
+        /* Nam châm di chuyển (Nam châm 2) */
+        #magnet-moving {
+            position: absolute;
+            top: 180px;
+            left: 550px;
+            width: 160px;
+            height: 30px;
+            display: flex;
+            transform: rotate(-15deg);
+            transition: left 0.1s linear, transform 0.1s linear;
+        }
+
+        /* Cực nam châm */
+        .pole {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            user-select: none;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.2);
+        }
+        .pole.n { background-color: var(--north-color); border-radius: 4px 0 0 4px; }
+        .pole.s { background-color: var(--south-color); border-radius: 0 4px 4px 0; }
+
+        /* Khung hiển thị trạng thái / Lời hướng dẫn */
+        #status-box {
+            background-color: #f8fafc;
+            border-left: 5px solid #3b82f6;
+            padding: 10px;
+            margin-bottom: 20px;
+            font-size: 16px;
+            font-weight: 500;
+            min-height: 24px;
+        }
+
+        /* Bảng nút điều khiển */
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button {
+            background-color: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button:hover { background-color: #2563eb; }
+        button:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+        button#btn-reset { background-color: #ef4444; }
+        button#btn-reset:hover { background-color: #dc2626; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>MÔ PHỎNG TƯƠNG TÁC GIỮA HAI NAM CHÂM</h2>
+    
+    <div id="canvas-container">
+        <div class="stand"></div>
+        
+        <div id="magnet-suspended">
+            <div class="pole n">N</div>
+            <div class="pole s">S</div>
+        </div>
+
+        <div id="magnet-moving">
+            <div class="pole n">N</div>
+            <div class="pole s">S</div>
+        </div>
+    </div>
+
+    <div id="status-box">Nhấn "Bắt đầu thí nghiệm" để quan sát hiện tượng.</div>
+
+    <div class="controls">
+        <button id="btn-start">🟢 Bắt đầu</button>
+        <button id="btn-pause" disabled>⏸️ Tạm dừng</button>
+        <button id="btn-step">⏭️ Xem từng bước</button>
+        <button id="btn-reset">🔄 Làm lại</button>
+    </div>
+</div>
+
+<script>
+    // Khởi tạo các phần tử DOM
+    const magSuspended = document.getElementById('magnet-suspended');
+    const magMoving = document.getElementById('magnet-moving');
+    const statusBox = document.getElementById('status-box');
+    
+    const btnStart = document.getElementById('btn-start');
+    const btnPause = document.getElementById('btn-pause');
+    const btnStep = document.getElementById('btn-step');
+    const btnReset = document.getElementById('btn-reset');
+
+    // Các biến quản lý trạng thái mô phỏng
+    let animationId = null;
+    let isPlaying = false;
+    let currentStep = 0; // 0: ban đầu, 1: Hút nhau (Hình a), 2: Đẩy nhau (Đối chứng)
+    
+    // Tọa độ cấu hình ban đầu
+    let moveX = 550;
+    let moveRot = -15;
+    let suspRot = 5;
+    let speed = 2; // Tốc độ di chuyển vừa phải cho học sinh quan sát
+
+    // Hàm tạo âm thanh bằng Web Audio API (Không cần file mp3 bên ngoài)
+    function playSound(type) {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        if (type === 'click') { // Âm thanh va chạm click
+            osc.frequency.setValueAtTime(150, ctx.currentTime);
+            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.1);
+        } else if (type === 'step') { // Âm thanh chuyển bước ting
+            osc.frequency.setValueAtTime(523.25, ctx.currentTime); // Nốt Đô
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.15);
+        }
+    }
+
+    // Cập nhật giao diện vị trí các nam châm
+    function updatePositions() {
+        magMoving.style.left = `${moveX}px`;
+        magMoving.style.transform = `rotate(${moveRot}deg)`;
+        magSuspended.style.transform = `translateX(-50%) rotate(${suspRot}deg)`;
+    }
+
+    // Logic vòng lặp chuyển động mô phỏng
+    function simulationLoop() {
+        if (!isPlaying) return;
+
+        if (currentStep === 1) { // Giai đoạn 1: Tiến gần và HÚT NHAU (Đúng hình a)
+            if (moveX > 330) {
+                moveX -= speed;
+                // Khi lại gần, lực hút làm nam châm treo lệch dần về phía nam châm di chuyển
+                if (moveX < 450) {
+                    suspRot += 0.25; 
+                }
+            } else {
+                // Khi chạm nhau (giống góc chạm trong hình a)
+                moveX = 330;
+                suspRot = 18;
+                moveRot = -12;
+                updatePositions();
+                playSound('click');
+                statusBox.innerHTML = "✨ <b>Hiện tượng:</b> Hai cực khác tên (S và N) dịch chuyển lại gần và <b>HÚT NHAU</b>.";
+                pauseSim();
+                return;
+            }
+        } 
+        else if (currentStep === 2) { // Giai đoạn 2: Đảo đầu cực và ĐẨY NHAU (Thí nghiệm mở rộng đối chứng)
+            if (moveX > 380) {
+                moveX -= speed;
+                // Khi cực cùng tên lại gần, nam châm treo bị lực đẩy xoay ra xa
+                if (moveX < 480) {
+                    suspRot -= 0.6; 
+                }
+            } else {
+                statusBox.innerHTML = "✨ <b>Hiện tượng:</b> Hai cực cùng tên (N và N) tiến lại gần sẽ <b>ĐẨY NHAU</b> ra xa.";
+                pauseSim();
+                return;
+            }
+        }
+
+        updatePositions();
+        animationId = requestAnimationFrame(simulationLoop);
+    }
+
+    function startSim() {
+        if (currentStep === 0) {
+            currentStep = 1; // Bắt đầu bằng bước 1 (Giống hình a)
+            statusBox.innerHTML = "🔮 Đang đưa cực N của nam châm 2 lại gần cực S của nam châm 1...";
+        }
+        isPlaying = true;
+        btnStart.disabled = true;
+        btnPause.disabled = false;
+        btnStep.disabled = true;
+        playSound('step');
+        simulationLoop();
+    }
+
+    function pauseSim() {
+        isPlaying = false;
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        btnStep.disabled = false;
+        btnStart.innerHTML = "▶️ Tiếp tục";
+        cancelAnimationFrame(animationId);
+    }
+
+    function resetSim() {
+        pauseSim();
+        currentStep = 0;
+        moveX = 550;
+        moveRot = -15;
+        suspRot = 5;
+        // Đặt lại nam châm 2 về trạng thái mặc định (N-đỏ bên trái, S-xanh bên phải)
+        magMoving.innerHTML = '<div class="pole n">N</div><div class="pole s">S</div>';
+        statusBox.innerHTML = "Nhấn 'Bắt đầu thí nghiệm' để quan sát hiện tượng.";
+        btnStart.innerHTML = "🟢 Bắt đầu";
+        btnStep.disabled = false;
+        updatePositions();
+    }
+
+    function stepSim() {
+        resetSim();
+        // Chuyển đổi qua lại giữa 2 bước thử nghiệm của bài học để học sinh dễ đối chiếu
+        if (currentStep === 0 || currentStep === 2) {
+            currentStep = 1;
+            statusBox.innerHTML = "📋 <b>Bước 1:</b> Thử nghiệm 2 cực khác tên lại gần nhau (S hướng vào N).";
+            startSim();
+        } else if (currentStep === 1) {
+            currentStep = 2;
+            // Xoay chiều nam châm di chuyển: Đổi đầu S ra trước để thử hiện tượng đẩy nhau
+            magMoving.innerHTML = '<div class="pole s">S</div><div class="pole n">N</div>';
+            moveRot = -15;
+            updatePositions();
+            statusBox.innerHTML = "📋 <b>Bước 2:</b> Thử nghiệm 2 cực cùng tên lại gần nhau (N hướng vào N).";
+            startSim();
+        }
+    }
+
+    // Lắng nghe sự kiện từ các nút bấm
+    btnStart.addEventListener('click', startSim);
+    btnPause.addEventListener('click', pauseSim);
+    btnReset.addEventListener('click', resetSim);
+    btnStep.addEventListener('click', stepSim);
+
+    // Cập nhật vị trí ban đầu khi tải trang
+    updatePositions();
+</script>
+
+</body>
+</html>

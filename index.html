@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mô phỏng Thí nghiệm Tương tác Nam châm</title>
+    <title>Mô phỏng Tương tác Nam châm Chuẩn Xác</title>
     <style>
         :root {
             --primary-color: #2c3e50;
@@ -37,6 +37,7 @@
         h2 {
             color: var(--primary-color);
             margin-top: 0;
+            font-size: 22px;
         }
 
         /* Khung mô phỏng thí nghiệm */
@@ -51,11 +52,11 @@
             margin-bottom: 20px;
         }
 
-        /* Giá treo */
+        /* Giá treo giá đỡ */
         .stand {
             position: absolute;
             top: 0;
-            left: 40%;
+            left: 45%;
             width: 80px;
             height: 10px;
             background-color: #334155;
@@ -64,35 +65,44 @@
             content: '';
             position: absolute;
             top: 0;
-            left: 35px;
+            left: 38px;
             width: 4px;
-            height: 120px;
+            height: 140px;
             background-color: #64748b;
         }
 
-        /* Nam châm treo (Nam châm 1) */
+        /* Hệ thống trục xoay cho Nam châm 1 (Treo) */
+        #magnet-suspended-holder {
+            position: absolute;
+            top: 140px; /* Điểm cuối của sợi dây treo */
+            left: calc(45% + 40px);
+            width: 0;
+            height: 0;
+            transform: rotate(0deg);
+            transition: transform 0.05s linear;
+        }
+
         #magnet-suspended {
             position: absolute;
-            top: 120px;
-            left: calc(40% + 37px);
+            top: -15px; /* Căn giữa thanh theo trục dọc */
+            left: -80px; /* Đặt tâm xoay chính xác ở giữa thanh nam châm (khuyên treo) */
             width: 160px;
             height: 30px;
-            transform-origin: top center;
-            transform: translateX(-50%) rotate(5deg);
             display: flex;
-            transition: transform 0.1s linear;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
 
         /* Nam châm di chuyển (Nam châm 2) */
         #magnet-moving {
             position: absolute;
-            top: 180px;
-            left: 550px;
+            top: 185px;
+            left: 580px;
             width: 160px;
             height: 30px;
             display: flex;
             transform: rotate(-15deg);
-            transition: left 0.1s linear, transform 0.1s linear;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: left 0.05s linear, transform 0.05s linear;
         }
 
         /* Cực nam châm */
@@ -114,11 +124,12 @@
         #status-box {
             background-color: #f8fafc;
             border-left: 5px solid #3b82f6;
-            padding: 10px;
+            padding: 12px;
             margin-bottom: 20px;
             font-size: 16px;
             font-weight: 500;
             min-height: 24px;
+            text-align: left;
         }
 
         /* Bảng nút điều khiển */
@@ -138,9 +149,6 @@
             border-radius: 6px;
             cursor: pointer;
             transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 5px;
         }
 
         button:hover { background-color: #2563eb; }
@@ -152,14 +160,16 @@
 <body>
 
 <div class="container">
-    <h2>MÔ PHỎNG TƯƠNG TÁC GIỮA HAI NAM CHÂM</h2>
+    <h2>MÔ PHỎNG TƯƠNG TÁC GIỮA HAI NAM CHÂM (BÀI HỌC VẬT LÝ)</h2>
     
     <div id="canvas-container">
         <div class="stand"></div>
         
-        <div id="magnet-suspended">
-            <div class="pole n">N</div>
-            <div class="pole s">S</div>
+        <div id="magnet-suspended-holder">
+            <div id="magnet-suspended">
+                <div class="pole n">N</div>
+                <div class="pole s">S</div>
+            </div>
         </div>
 
         <div id="magnet-moving">
@@ -168,7 +178,7 @@
         </div>
     </div>
 
-    <div id="status-box">Nhấn "Bắt đầu thí nghiệm" để quan sát hiện tượng.</div>
+    <div id="status-box">Nhấn <b>"Bắt đầu"</b> để tiến hành chuỗi thí nghiệm tương tác.</div>
 
     <div class="controls">
         <button id="btn-start">🟢 Bắt đầu</button>
@@ -179,8 +189,7 @@
 </div>
 
 <script>
-    // Khởi tạo các phần tử DOM
-    const magSuspended = document.getElementById('magnet-suspended');
+    const holder = document.getElementById('magnet-suspended-holder');
     const magMoving = document.getElementById('magnet-moving');
     const statusBox = document.getElementById('status-box');
     
@@ -189,18 +198,16 @@
     const btnStep = document.getElementById('btn-step');
     const btnReset = document.getElementById('btn-reset');
 
-    // Các biến quản lý trạng thái mô phỏng
     let animationId = null;
     let isPlaying = false;
-    let currentStep = 0; // 0: ban đầu, 1: Hút nhau (Hình a), 2: Đẩy nhau (Đối chứng)
+    let currentStep = 1; // Bước 1: Khác cực (Hút), Bước 2: Cùng cực (Đẩy)
     
-    // Tọa độ cấu hình ban đầu
-    let moveX = 550;
+    // Tọa độ khởi tạo mặc định
+    let moveX = 580;
     let moveRot = -15;
-    let suspRot = 5;
-    let speed = 2; // Tốc độ di chuyển vừa phải cho học sinh quan sát
+    let suspRot = 0;
+    const speed = 2.5;
 
-    // Hàm tạo âm thanh bằng Web Audio API (Không cần file mp3 bên ngoài)
     function playSound(type) {
         const ctx = new (window.AudioContext || window.webkitAudioContext)();
         const osc = ctx.createOscillator();
@@ -208,61 +215,60 @@
         osc.connect(gain);
         gain.connect(ctx.destination);
 
-        if (type === 'click') { // Âm thanh va chạm click
-            osc.frequency.setValueAtTime(150, ctx.currentTime);
-            gain.gain.setValueAtTime(0.3, ctx.currentTime);
+        if (type === 'click') {
+            osc.frequency.setValueAtTime(120, ctx.currentTime);
+            gain.gain.setValueAtTime(0.4, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.08);
+            osc.start(); osc.stop(ctx.currentTime + 0.08);
+        } else if (type === 'step') {
+            osc.frequency.setValueAtTime(440, ctx.currentTime);
+            gain.gain.setValueAtTime(0.15, ctx.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.1);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.1);
-        } else if (type === 'step') { // Âm thanh chuyển bước ting
-            osc.frequency.setValueAtTime(523.25, ctx.currentTime); // Nốt Đô
-            gain.gain.setValueAtTime(0.1, ctx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-            osc.start();
-            osc.stop(ctx.currentTime + 0.15);
+            osc.start(); osc.stop(ctx.currentTime + 0.1);
         }
     }
 
-    // Cập nhật giao diện vị trí các nam châm
     function updatePositions() {
         magMoving.style.left = `${moveX}px`;
         magMoving.style.transform = `rotate(${moveRot}deg)`;
-        magSuspended.style.transform = `translateX(-50%) rotate(${suspRot}deg)`;
+        holder.style.transform = `rotate(${suspRot}deg)`;
     }
 
-    // Logic vòng lặp chuyển động mô phỏng
     function simulationLoop() {
         if (!isPlaying) return;
 
-        if (currentStep === 1) { // Giai đoạn 1: Tiến gần và HÚT NHAU (Đúng hình a)
-            if (moveX > 330) {
+        if (currentStep === 1) { 
+            // THÍ NGHIỆM 1: HAI CỰC KHÁC TÊN (S gặp N) -> HÚT NHAU DÍNH CHẶT
+            if (moveX > 328) { // Khoảng cách tới điểm va chạm lý tưởng
                 moveX -= speed;
-                // Khi lại gần, lực hút làm nam châm treo lệch dần về phía nam châm di chuyển
-                if (moveX < 450) {
-                    suspRot += 0.25; 
+                if (moveX < 460) {
+                    suspRot += 0.42; // Nam châm treo từ từ bị hút nghiêng đầu xuống sát
                 }
             } else {
-                // Khi chạm nhau (giống góc chạm trong hình a)
-                moveX = 330;
-                suspRot = 18;
-                moveRot = -12;
+                // Điểm dính khít hình học chuẩn tuyệt đối không bị hở lệch
+                moveX = 328;
+                suspRot = 21;
+                moveRot = -15;
                 updatePositions();
                 playSound('click');
-                statusBox.innerHTML = "✨ <b>Hiện tượng:</b> Hai cực khác tên (S và N) dịch chuyển lại gần và <b>HÚT NHAU</b>.";
-                pauseSim();
+                statusBox.innerHTML = "✨ <b>Kết luận Bước 1:</b> Khi đưa hai đầu cực <b>KHÁC TÊN</b> lại gần nhau (Cực S màu xanh và Cực N màu đỏ), chúng tạo ra lực từ hút mạnh và <b>HÚT NHAU DÍNH SÁT KHÍT</b>.";
+                endCurrentStep();
                 return;
             }
         } 
-        else if (currentStep === 2) { // Giai đoạn 2: Đảo đầu cực và ĐẨY NHAU (Thí nghiệm mở rộng đối chứng)
-            if (moveX > 380) {
+        else if (currentStep === 2) { 
+            // THÍ NGHIỆM 2: HAI CỰC CÙNG TÊN (N gặp N) -> ĐẨY NHAU LỆCH HẲN
+            if (moveX > 390) { 
                 moveX -= speed;
-                // Khi cực cùng tên lại gần, nam châm treo bị lực đẩy xoay ra xa
-                if (moveX < 480) {
-                    suspRot -= 0.6; 
+                if (moveX < 500) {
+                    suspRot -= 0.75; // Bị đẩy mạnh ngược chiều, đuôi văng lên, đầu tránh xa cực kia
                 }
             } else {
-                statusBox.innerHTML = "✨ <b>Hiện tượng:</b> Hai cực cùng tên (N và N) tiến lại gần sẽ <b>ĐẨY NHAU</b> ra xa.";
-                pauseSim();
+                moveX = 390;
+                suspRot = -25; // Đạt độ lệch tối đa thể hiện lực đẩy mạnh
+                updatePositions();
+                statusBox.innerHTML = "✨ <b>Kết luận Bước 2:</b> Khi đưa hai đầu cực <b>CÙNG TÊN</b> lại gần nhau (Cực N màu đỏ và Cực N màu đỏ), chúng xuất hiện lực từ đẩy nhau và <b>ĐẨY NHAU RA XA</b>.";
+                endCurrentStep();
                 return;
             }
         }
@@ -272,15 +278,18 @@
     }
 
     function startSim() {
-        if (currentStep === 0) {
-            currentStep = 1; // Bắt đầu bằng bước 1 (Giống hình a)
-            statusBox.innerHTML = "🔮 Đang đưa cực N của nam châm 2 lại gần cực S của nam châm 1...";
-        }
         isPlaying = true;
         btnStart.disabled = true;
         btnPause.disabled = false;
         btnStep.disabled = true;
         playSound('step');
+        
+        if (currentStep === 1) {
+            statusBox.innerHTML = "🔮 <i>Đang thực nghiệm:</i> Đưa cực <b>N (Đỏ)</b> lại gần cực <b>S (Xanh)</b> của nam châm treo...";
+        } else {
+            statusBox.innerHTML = "🔮 <i>Đang thực nghiệm:</i> Đảo đầu nam châm di chuyển, đưa cực <b>N (Đỏ)</b> lại gần cực <b>N (Đỏ)</b> của nam châm treo...";
+        }
+        
         simulationLoop();
     }
 
@@ -293,45 +302,83 @@
         cancelAnimationFrame(animationId);
     }
 
+    function endCurrentStep() {
+        isPlaying = false;
+        btnStart.disabled = false;
+        btnPause.disabled = true;
+        btnStep.disabled = false;
+        
+        if (currentStep === 1) {
+            btnStart.innerHTML = "⏭️ Chuyển Bước 2 (Đẩy)";
+        } else {
+            btnStart.innerHTML = "▶️ Chạy lại từ đầu";
+        }
+        cancelAnimationFrame(animationId);
+    }
+
     function resetSim() {
         pauseSim();
-        currentStep = 0;
-        moveX = 550;
+        currentStep = 1;
+        moveX = 580;
         moveRot = -15;
-        suspRot = 5;
-        // Đặt lại nam châm 2 về trạng thái mặc định (N-đỏ bên trái, S-xanh bên phải)
+        suspRot = 0;
+        
+        // Đặt lại nam châm di chuyển về cấu hình ban đầu (N-Đỏ hướng sang trái)
         magMoving.innerHTML = '<div class="pole n">N</div><div class="pole s">S</div>';
-        statusBox.innerHTML = "Nhấn 'Bắt đầu thí nghiệm' để quan sát hiện tượng.";
+        statusBox.innerHTML = "Nhấn <b>\"Bắt đầu\"</b> để tiến hành chuỗi thí nghiệm tương tác.";
         btnStart.innerHTML = "🟢 Bắt đầu";
         btnStep.disabled = false;
         updatePositions();
     }
 
     function stepSim() {
-        resetSim();
-        // Chuyển đổi qua lại giữa 2 bước thử nghiệm của bài học để học sinh dễ đối chiếu
-        if (currentStep === 0 || currentStep === 2) {
-            currentStep = 1;
-            statusBox.innerHTML = "📋 <b>Bước 1:</b> Thử nghiệm 2 cực khác tên lại gần nhau (S hướng vào N).";
-            startSim();
-        } else if (currentStep === 1) {
-            currentStep = 2;
-            // Xoay chiều nam châm di chuyển: Đổi đầu S ra trước để thử hiện tượng đẩy nhau
-            magMoving.innerHTML = '<div class="pole s">S</div><div class="pole n">N</div>';
+        pauseSim();
+        if (currentStep === 1) {
+            // Đang ở bước 1 hoặc chuẩn bị chạy bước 2
+            // Chuẩn bị cấu hình đẩy nhau: Đảo đầu nam châm dịch chuyển (để đầu N hướng sang trái, nam châm treo cũng đầu N hướng sang trái)
+            // Lật ngược thanh di chuyển để đầu N đỏ gặp đầu N đỏ của thanh treo
+            moveX = 580;
             moveRot = -15;
-            updatePositions();
-            statusBox.innerHTML = "📋 <b>Bước 2:</b> Thử nghiệm 2 cực cùng tên lại gần nhau (N hướng vào N).";
+            suspRot = 0;
+            // Ta lật thanh 2 thành S-N để đầu N hướng về phía nam châm treo vốn có cấu trúc N-S (N nằm bên trái)
+            // Nhưng nam châm treo đầu N nằm ở Trục Trái. Do đó để 2 đầu N gặp nhau, thanh di chuyển phải đổi đầu S sang phải, N sang trái
+            // Như vậy mặc định (N bên trái, S bên phải) đưa sát vào thanh treo (N bên trái, S bên phải) thì đầu N thanh di chuyển sẽ đâm vào đầu S thanh treo (Hút).
+            // Để ĐẨY: Cần đầu N thanh di chuyển chạm đầu N thanh treo? Không, trong cấu trúc hình vẽ, đuôi của thanh treo là S, đầu là N. Thanh di chuyển tiến từ phải sang trái.
+            // Vậy nó sẽ tiếp cận đầu S (phía bên phải) của thanh treo trước!
+            // Do đó: Để Hút -> Đưa đầu N (Đỏ) tiếp cận đầu S (Xanh) của thanh treo (Mặc định).
+            // Để Đẩy -> Đưa đầu S (Xanh) tiếp cận đầu S (Xanh) của thanh treo.
+            magMoving.innerHTML = '<div class="pole s">S</div><div class="pole n">N</div>';
+            currentStep = 2;
+            statusBox.innerHTML = "📋 <b>Cấu hình Bước 2:</b> Thử nghiệm đưa hai cực cùng tên lại gần nhau (S hướng vào S).";
             startSim();
+        } else {
+            resetSim();
         }
     }
 
-    // Lắng nghe sự kiện từ các nút bấm
-    btnStart.addEventListener('click', startSim);
+    // Xử lý logic nút bấm thông minh tự nhận diện bước tiếp theo
+    btnStart.addEventListener('click', () => {
+        if (btnStart.innerHTML.includes("Chuyển Bước 2")) {
+            currentStep = 2;
+            magMoving.innerHTML = '<div class="pole s">S</div><div class="pole n">N</div>';
+            moveX = 580;
+            moveRot = -15;
+            suspRot = 0;
+            updatePositions();
+            startSim();
+        } else if (btnStart.innerHTML.includes("Chạy lại")) {
+            resetSim();
+            startSim();
+        } else {
+            startSim();
+        }
+    });
+
     btnPause.addEventListener('click', pauseSim);
     btnReset.addEventListener('click', resetSim);
     btnStep.addEventListener('click', stepSim);
 
-    // Cập nhật vị trí ban đầu khi tải trang
+    // Render trạng thái cân bằng tĩnh lúc đầu
     updatePositions();
 </script>
 
